@@ -656,7 +656,7 @@ export default function ArticleEditor({ type, articleId }: Props) {
         <Text fontSize="14px" fontWeight={550} mb="15px">
           Cover Image
         </Text>
-        {coverMedia?.url ? (
+        {coverMedia ? (
           <Box mb="12px">
             <Box
               overflow="hidden"
