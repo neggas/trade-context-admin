@@ -4,6 +4,7 @@ import { Box, Flex, Text, Button } from "@chakra-ui/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { Article } from "types";
+import { mediaSrc } from "lib/media";
 
 export default function PreviewModal() {
   const router = useRouter();
@@ -109,7 +110,7 @@ export default function PreviewModal() {
             </Text>
           )}
 
-          {article.coverMedia?.url && (
+          {article.coverMedia && mediaSrc(article.coverMedia) && (
             <Box
               mt="32px"
               overflow="hidden"
@@ -121,7 +122,7 @@ export default function PreviewModal() {
             >
               {article.coverMedia.mimeType?.startsWith("video/") ? (
                 <video
-                  src={article.coverMedia.url}
+                  src={mediaSrc(article.coverMedia)}
                   controls
                   style={{
                     display: "block",
@@ -134,7 +135,7 @@ export default function PreviewModal() {
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={article.coverMedia.url}
+                  src={mediaSrc(article.coverMedia)}
                   alt={article.coverMedia.alt ?? article.title}
                   style={{
                     display: "block",
@@ -268,7 +269,7 @@ export default function PreviewModal() {
                 </Text>
               )}
               {section.media?.map((m) =>
-                m.url ? (
+                mediaSrc(m) ? (
                   <Box
                     key={m.id}
                     mt="20px"
@@ -281,7 +282,7 @@ export default function PreviewModal() {
                   >
                     {m.mimeType?.startsWith("video/") ? (
                       <video
-                        src={m.url}
+                        src={mediaSrc(m)}
                         controls
                         style={{
                           display: "block",
@@ -294,7 +295,7 @@ export default function PreviewModal() {
                     ) : (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={m.url}
+                        src={mediaSrc(m)}
                         alt={m.alt ?? section.title ?? ""}
                         style={{
                           display: "block",

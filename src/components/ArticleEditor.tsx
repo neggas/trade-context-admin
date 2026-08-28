@@ -35,6 +35,7 @@ import type {
   TradeStatus,
 } from "types";
 import ImageCropModal from "./ImageCropModal";
+import { mediaSrc } from "lib/media";
 
 type CropJob =
   | { file: File; kind: "cover" }
@@ -666,7 +667,7 @@ export default function ArticleEditor({ type, articleId }: Props) {
               aspectRatio="16 / 9"
             >
               <ChakraImage
-                src={coverMedia.url}
+                src={mediaSrc(coverMedia)}
                 alt={coverMedia.alt ?? coverMedia.originalName ?? "cover"}
                 w="100%"
                 h="100%"
@@ -768,9 +769,9 @@ export default function ArticleEditor({ type, articleId }: Props) {
                   bg="#0A0C0F"
                 >
                   <Box aspectRatio="16 / 9" overflow="hidden" bg="#0A0C0F">
-                    {m.url && isVideo(m.mimeType) ? (
+                    {mediaSrc(m) && isVideo(m.mimeType) ? (
                       <video
-                        src={m.url}
+                        src={mediaSrc(m)}
                         style={{
                           width: "100%",
                           height: "100%",
@@ -779,9 +780,9 @@ export default function ArticleEditor({ type, articleId }: Props) {
                         }}
                       />
                     ) : (
-                      m.url && (
+                      mediaSrc(m) && (
                         <ChakraImage
-                          src={m.url}
+                          src={mediaSrc(m)}
                           alt={m.alt ?? m.originalName ?? ""}
                           w="100%"
                           h="100%"
