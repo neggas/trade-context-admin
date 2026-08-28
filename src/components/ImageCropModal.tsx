@@ -163,7 +163,7 @@ export default function ImageCropModal({ file, onCancel, onConfirm }: Props) {
           bg="#0A0C0F"
           cursor="grab"
           userSelect="none"
-          touchAction="none"
+          sx={{ touchAction: "none" }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
