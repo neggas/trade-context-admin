@@ -3,22 +3,33 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
+    "@chakra-ui/react": "^2.10.10",
+    "@chakra-ui/theme": "^3.4.6",
+    "@chakra-ui/theme-tools": "^2.2.6",
+    "@chakra-ui/theme-utils": "^2.0.21",
+    "@emotion/react": "^11",
+    "@emotion/styled": "^11",
+    "@tanstack/react-query": "^5.102.4",
+    "bcryptjs": "^3.0.3",
+    "framer-motion": "^11",
+    "next": "14.2.35",
+    "next-auth": "^4.24.15",
     "react": "^18",
-    "react-dom": "^18",
-    "next": "14.2.35"
+    "react-dom": "^18"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@types/bcryptjs": "^3.0.0",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "eslint": "^8",
-    "eslint-config-next": "14.2.35"
+    "eslint-config-next": "14.2.35",
+    "typescript": "^5"
   }
 }
