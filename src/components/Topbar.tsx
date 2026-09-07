@@ -7,7 +7,6 @@ import Link from "next/link";
 const pageNames: Record<string, string> = {
   "/": "Dashboard",
   "/live": "Live Trades",
-  "/backtest": "Backtests",
   "/notes": "Notes",
   "/settings": "Settings",
 };
@@ -18,7 +17,6 @@ export default function Topbar() {
 
   const isNewPage = pathname.includes("/new");
   const isLiveSection = pathname.startsWith("/live");
-  const isBacktestSection = pathname.startsWith("/backtest");
 
   return (
     <Flex
@@ -40,11 +38,6 @@ export default function Topbar() {
         {isLiveSection && !isNewPage && (
           <Link href="/live/new">
             <Button variant="primary">+ New Trade</Button>
-          </Link>
-        )}
-        {isBacktestSection && !isNewPage && (
-          <Link href="/backtest/new">
-            <Button variant="primary">+ New Backtest</Button>
           </Link>
         )}
       </Flex>

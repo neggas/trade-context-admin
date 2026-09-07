@@ -87,7 +87,7 @@ export default function PreviewModal() {
         {/* Article content */}
         <Box p="45px 55px">
           <Text fontSize="11px" color="accent" textTransform="uppercase" letterSpacing="0.12em" fontWeight={600}>
-            {article.type === "live" ? "Live Trade" : "Backtest"}
+            Live Trade
           </Text>
           <Text
             fontSize="clamp(32px, 5vw, 52px)"
@@ -192,50 +192,6 @@ export default function PreviewModal() {
                     >
                       {article.trade.resultR > 0 ? "+" : ""}
                       {article.trade.resultR.toFixed(2)}R
-                    </Text>
-                  </Box>
-                )}
-              </Flex>
-            </Box>
-          )}
-
-          {/* Backtest info */}
-          {article.backtest && (
-            <Box
-              mt="35px"
-              p="25px"
-              border="1px solid"
-              borderColor="border"
-              bg="surface"
-            >
-              <Flex gap="30px" flexWrap="wrap">
-                <Box>
-                  <Text fontSize="9px" color="muted" textTransform="uppercase" letterSpacing="0.1em">
-                    Strategy
-                  </Text>
-                  <Text fontSize="14px" mt="7px">{article.backtest.strategyName}</Text>
-                </Box>
-                <Box>
-                  <Text fontSize="9px" color="muted" textTransform="uppercase" letterSpacing="0.1em">
-                    Market
-                  </Text>
-                  <Text fontSize="14px" mt="7px">{article.backtest.market}</Text>
-                </Box>
-                {article.backtest.winRate !== null && (
-                  <Box>
-                    <Text fontSize="9px" color="muted" textTransform="uppercase" letterSpacing="0.1em">
-                      Win Rate
-                    </Text>
-                    <Text fontSize="14px" mt="7px">{article.backtest.winRate.toFixed(1)}%</Text>
-                  </Box>
-                )}
-                {article.backtest.totalR !== null && (
-                  <Box>
-                    <Text fontSize="9px" color="muted" textTransform="uppercase" letterSpacing="0.1em">
-                      Total R
-                    </Text>
-                    <Text fontSize="14px" mt="7px" color="profit">
-                      +{article.backtest.totalR.toFixed(1)}R
                     </Text>
                   </Box>
                 )}

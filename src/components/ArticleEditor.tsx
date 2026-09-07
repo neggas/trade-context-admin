@@ -56,9 +56,18 @@ type Props = {
 
 const isVideo = (mime?: string) => !!mime && mime.startsWith("video/");
 
+const toDateTimeLocal = (iso: string | null): string => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours()
+  )}:${pad(d.getMinutes())}`;
+};
+
 export default function ArticleEditor({ type, articleId }: Props) {
   const router = useRouter();
-  const listPath = type === "live" ? "/live" : "/backtest";
+  const listPath = "/live";
 
   const { data: article, isLoading } = useAdminArticle(articleId);
   const createMutation = useCreateArticle();
@@ -77,7 +86,6 @@ export default function ArticleEditor({ type, articleId }: Props) {
   const [slug, setSlug] = useState("");
   const [excerpt, setExcerpt] = useState("");
   const [status, setStatus] = useState<"draft" | "published">("draft");
-  const [publishedAt, setPublishedAt] = useState("");
   const [sections, setSections] = useState<SectionState[]>([
     { title: "", titleSize: "h2", content: "", media: [] },
   ]);
@@ -109,18 +117,15 @@ export default function ArticleEditor({ type, articleId }: Props) {
     setSlug(article.slug);
     setExcerpt(article.excerpt ?? "");
     setStatus(article.status === "published" ? "published" : "draft");
-    setPublishedAt(
-      article.publishedAt ? article.publishedAt.split("T")[0] : ""
-    );
     setSections(
       article.sections.length > 0
         ? article.sections.map((s) => ({
-            id: s.id,
-            title: s.title ?? "",
-            titleSize: s.titleSize,
-            content: s.content ?? "",
-            media: s.media ?? [],
-          }))
+          id: s.id,
+          title: s.title ?? "",
+          titleSize: s.titleSize,
+          content: s.content ?? "",
+          media: s.media ?? [],
+        }))
         : [{ title: "", titleSize: "h2", content: "", media: [] }]
     );
     setCoverMedia(article.coverMedia ?? null);
@@ -137,12 +142,8 @@ export default function ArticleEditor({ type, articleId }: Props) {
         article.trade.resultR !== null ? String(article.trade.resultR) : ""
       );
       setTradeStatus(article.trade.status);
-      setOpenedAt(
-        article.trade.openedAt ? article.trade.openedAt.split("T")[0] : ""
-      );
-      setClosedAt(
-        article.trade.closedAt ? article.trade.closedAt.split("T")[0] : ""
-      );
+      setOpenedAt(toDateTimeLocal(article.trade.openedAt));
+      setClosedAt(toDateTimeLocal(article.trade.closedAt));
     }
   }, [article?.id]);
 
@@ -214,7 +215,10 @@ export default function ArticleEditor({ type, articleId }: Props) {
       slug: generatedSlug,
       excerpt: excerpt || null,
       status,
-      publishedAt: publishedAt ? new Date(publishedAt).toISOString() : null,
+      publishedAt:
+        status === "published"
+          ? article?.publishedAt ?? new Date().toISOString()
+          : null,
       sections: sectionInputs,
     };
 
@@ -408,23 +412,22 @@ export default function ArticleEditor({ type, articleId }: Props) {
       })),
       trade: input.trade
         ? {
-            id: "preview-trade",
-            articleId: persistedId ?? "preview",
-            symbol: input.trade.symbol,
-            direction: input.trade.direction,
-            entryPrice: input.trade.entryPrice,
-            stopLoss: input.trade.stopLoss ?? null,
-            takeProfit: input.trade.takeProfit ?? null,
-            resultR: input.trade.resultR ?? null,
-            status: input.trade.status,
-            openedAt: input.trade.openedAt ?? null,
-            closedAt: input.trade.closedAt ?? null,
-            events: [],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          }
+          id: "preview-trade",
+          articleId: persistedId ?? "preview",
+          symbol: input.trade.symbol,
+          direction: input.trade.direction,
+          entryPrice: input.trade.entryPrice,
+          stopLoss: input.trade.stopLoss ?? null,
+          takeProfit: input.trade.takeProfit ?? null,
+          resultR: input.trade.resultR ?? null,
+          status: input.trade.status,
+          openedAt: input.trade.openedAt ?? null,
+          closedAt: input.trade.closedAt ?? null,
+          events: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
         : null,
-      backtest: null,
       coverMedia,
     };
     sessionStorage.setItem("preview-article", JSON.stringify(previewArticle));
@@ -478,12 +481,8 @@ export default function ArticleEditor({ type, articleId }: Props) {
     );
   }
 
-  const pageTitle = persistedId
-    ? "Edit"
-    : type === "live"
-      ? "New Trade"
-      : "New Backtest";
-  const pageLabel = type === "live" ? "Live Trade" : "Backtest";
+  const pageTitle = persistedId ? "Edit" : "New Trade";
+  const pageLabel = "Live Trade";
 
   return (
     <Box maxW="900px" p="55px 35px 100px" m="auto">
@@ -529,28 +528,18 @@ export default function ArticleEditor({ type, articleId }: Props) {
           />
         </FormControl>
 
-        <Grid templateColumns="1fr 1fr" gap="18px" mb="25px">
-          <FormControl>
-            <FormLabel variant="fieldLabel">Status</FormLabel>
-            <Select
-              value={status}
-              onChange={(e) =>
-                setStatus(e.target.value as "draft" | "published")
-              }
-            >
-              <option value="draft">Draft</option>
-              <option value="published">Published</option>
-            </Select>
-          </FormControl>
-          <FormControl>
-            <FormLabel variant="fieldLabel">Published Date</FormLabel>
-            <Input
-              type="date"
-              value={publishedAt}
-              onChange={(e) => setPublishedAt(e.target.value)}
-            />
-          </FormControl>
-        </Grid>
+        <FormControl mb="25px">
+          <FormLabel variant="fieldLabel">Status</FormLabel>
+          <Select
+            value={status}
+            onChange={(e) =>
+              setStatus(e.target.value as "draft" | "published")
+            }
+          >
+            <option value="draft">Draft</option>
+            <option value="published">Published</option>
+          </Select>
+        </FormControl>
       </Box>
 
       <Box mb="35px">
@@ -636,7 +625,7 @@ export default function ArticleEditor({ type, articleId }: Props) {
           <FormControl>
             <FormLabel variant="fieldLabel">Opened At</FormLabel>
             <Input
-              type="date"
+              type="datetime-local"
               value={openedAt}
               onChange={(e) => setOpenedAt(e.target.value)}
             />
@@ -644,7 +633,7 @@ export default function ArticleEditor({ type, articleId }: Props) {
           <FormControl>
             <FormLabel variant="fieldLabel">Closed At</FormLabel>
             <Input
-              type="date"
+              type="datetime-local"
               value={closedAt}
               onChange={(e) => setClosedAt(e.target.value)}
             />

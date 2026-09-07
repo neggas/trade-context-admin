@@ -1,10 +1,13 @@
 "use client";
 
 import { Box, Grid, GridItem, Text } from "@chakra-ui/react";
-import { useAdminStats } from "lib/queries";
+import { useAdminStats, useAdminArticles } from "lib/queries";
+import PerformanceCalendar from "components/PerformanceCalendar";
 
 export default function DashboardPage() {
   const { data: stats, isLoading } = useAdminStats();
+  const { data: articles, isLoading: isLoadingArticles } =
+    useAdminArticles("live");
 
   const statItems = [
     {
@@ -13,7 +16,11 @@ export default function DashboardPage() {
     },
     {
       label: "Total R",
-      value: isLoading ? "—" : stats ? `+${stats.totalR.toFixed(1)}R` : "—",
+      value: isLoading
+        ? "—"
+        : stats
+          ? `${stats.totalR > 0 ? "+" : ""}${stats.totalR.toFixed(1)}R`
+          : "—",
     },
     {
       label: "Win rate",
@@ -59,6 +66,20 @@ export default function DashboardPage() {
           </GridItem>
         ))}
       </Grid>
+
+      <Box mt="55px">
+        <Text variant="pageLabel" mb="8px">
+          Calendar
+        </Text>
+        <Text variant="pageTitle" mb="25px">
+          Calendrier des performances
+        </Text>
+        {isLoadingArticles ? (
+          <Text color="muted">Loading calendar...</Text>
+        ) : (
+          <PerformanceCalendar articles={articles ?? []} />
+        )}
+      </Box>
     </Box>
   );
 }

@@ -58,24 +58,6 @@ export type Trade = {
   updatedAt: string;
 };
 
-export type Backtest = {
-  id: string;
-  articleId: string;
-  strategyName: string;
-  market: string;
-  timeframe: string | null;
-  periodStart: string | null;
-  periodEnd: string | null;
-  totalTrades: number;
-  winningTrades: number;
-  losingTrades: number;
-  winRate: number | null;
-  totalR: number | null;
-  maxDrawdownR: number | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
 export type Article = {
   id: string;
   type: ArticleType;
@@ -88,7 +70,6 @@ export type Article = {
   updatedAt: string;
   sections: ArticleSection[];
   trade: Trade | null;
-  backtest: Backtest | null;
   coverMedia: Media | null;
 };
 
@@ -103,12 +84,8 @@ export type ArticleListItem = {
   symbol: string | null;
   resultR: number | null;
   tradeStatus: TradeStatus | null;
-  // Backtest fields
-  market: string | null;
-  timeframe: string | null;
-  totalTrades: number | null;
-  winRate: number | null;
-  totalBacktestR: number | null;
+  openedAt: string | null;
+  closedAt: string | null;
   coverUrl?: string | null;
 };
 
@@ -118,7 +95,6 @@ export type AdminStats = {
   winRate: number | null;
   drafts: number;
   liveCount: number;
-  backtestCount: number;
 };
 
 // Input types for create/update
@@ -150,20 +126,6 @@ export type TradeInput = {
   events?: TradeEventInput[];
 };
 
-export type BacktestInput = {
-  strategyName: string;
-  market: string;
-  timeframe?: string | null;
-  periodStart?: string | null;
-  periodEnd?: string | null;
-  totalTrades?: number;
-  winningTrades?: number;
-  losingTrades?: number;
-  winRate?: number | null;
-  totalR?: number | null;
-  maxDrawdownR?: number | null;
-};
-
 export type ArticleInput = {
   type: ArticleType;
   title: string;
@@ -173,5 +135,4 @@ export type ArticleInput = {
   publishedAt?: string | null;
   sections?: SectionInput[];
   trade?: TradeInput | null;
-  backtest?: BacktestInput | null;
 };
