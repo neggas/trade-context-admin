@@ -1,43 +1,38 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import {
-  Box,
-  Button,
-  Flex,
-  Grid,
-  Input,
-  Select,
-  Text,
-} from "@chakra-ui/react";
+import { Box, Button, Flex, Grid, Select, Text } from "@chakra-ui/react";
 import type { ArticleListItem } from "types";
 
-type Unit = "dollar" | "r" | "percent";
-type BalanceMode = "initial" | "current";
+type Unit = "dollar" | "r";
 type View = "month" | "year";
+
+type DayTrade = {
+  id: string;
+  symbol: string;
+  r: number | null;
+  pnlUsd: number | null;
+};
 
 type DayData = {
   date: Date;
   inMonth: boolean;
+  trades: DayTrade[];
   count: number;
-  r: number;
-  value: number;
-  balance: number;
+  totalR: number;
+  totalPnl: number;
 };
 
 type MonthData = {
   month: number;
   year: number;
   count: number;
-  r: number;
-  value: number;
+  totalR: number;
+  totalPnl: number;
 };
 
 const LS_KEYS = {
-  balance: "tj-admin-calendar-balance",
-  risk: "tj-admin-calendar-risk",
   unit: "tj-admin-calendar-unit",
-  mode: "tj-admin-calendar-mode",
   view: "tj-admin-calendar-view",
 };
 
@@ -60,7 +55,15 @@ const monthLabels = [
 const pad = (n: number) => String(n).padStart(2, "0");
 const toDateKey = (d: Date) =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const fromISO = (iso: string) => new Date(iso);
+
+/** Prefer closedAt, then openedAt, then publishedAt */
+function tradeDateKey(a: ArticleListItem): string | null {
+  const iso = a.closedAt || a.openedAt || a.publishedAt;
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return toDateKey(d);
+}
 
 export default function PerformanceCalendar({
   articles,
@@ -73,95 +76,55 @@ export default function PerformanceCalendar({
   const [currentMonth, setCurrentMonth] = useState(now.getMonth());
   const [view, setView] = useState<View>("month");
   const [unit, setUnit] = useState<Unit>("dollar");
-  const [balanceMode, setBalanceMode] = useState<BalanceMode>("initial");
-  const [initialBalance, setInitialBalance] = useState(10000);
-  const [riskPercent, setRiskPercent] = useState(1);
 
   useEffect(() => {
     setMounted(true);
     setView((localStorage.getItem(LS_KEYS.view) as View) || "month");
     setUnit((localStorage.getItem(LS_KEYS.unit) as Unit) || "dollar");
-    setBalanceMode(
-      (localStorage.getItem(LS_KEYS.mode) as BalanceMode) || "initial"
-    );
-    setInitialBalance(Number(localStorage.getItem(LS_KEYS.balance) || 10000));
-    setRiskPercent(Number(localStorage.getItem(LS_KEYS.risk) || 1));
   }, []);
 
   useEffect(() => {
     if (!mounted) return;
     localStorage.setItem(LS_KEYS.view, view);
     localStorage.setItem(LS_KEYS.unit, unit);
-    localStorage.setItem(LS_KEYS.mode, balanceMode);
-    localStorage.setItem(LS_KEYS.balance, String(initialBalance));
-    localStorage.setItem(LS_KEYS.risk, String(riskPercent));
-  }, [mounted, view, unit, balanceMode, initialBalance, riskPercent]);
-
-  const trades = useMemo(
-    () =>
-      articles
-        .filter(
-          (a) =>
-            a.type === "live" && a.closedAt && a.resultR !== null
-        )
-        .map((a) => ({
-          day: toDateKey(fromISO(a.closedAt!)),
-          r: a.resultR!,
-        }))
-        .sort((a, b) => a.day.localeCompare(b.day)),
-    [articles]
-  );
+  }, [mounted, view, unit]);
 
   const dayMap = useMemo(() => {
-    const map = new Map<string, { count: number; r: number }>();
-    for (const t of trades) {
-      const existing = map.get(t.day) || { count: 0, r: 0 };
-      existing.count += 1;
-      existing.r += t.r;
-      map.set(t.day, existing);
+    const map = new Map<string, DayTrade[]>();
+
+    for (const a of articles) {
+      if (a.type !== "live") continue;
+      const hasR = a.resultR !== null && a.resultR !== undefined;
+      const hasPnl = a.pnlUsd !== null && a.pnlUsd !== undefined;
+      if (!hasR && !hasPnl) continue;
+
+      const day = tradeDateKey(a);
+      if (!day) continue;
+
+      const list = map.get(day) || [];
+      list.push({
+        id: a.id,
+        symbol: a.symbol || "—",
+        r: hasR ? Number(a.resultR) : null,
+        pnlUsd: hasPnl ? Number(a.pnlUsd) : null,
+      });
+      map.set(day, list);
     }
+
     return map;
-  }, [trades]);
+  }, [articles]);
 
-  const valueMap = useMemo(() => {
-    const sorted = Array.from(dayMap.entries()).sort(([a], [b]) =>
-      a.localeCompare(b)
-    );
-    const result = new Map<string, { value: number; balance: number }>();
-    let balance = initialBalance;
-
-    for (const [day, data] of sorted) {
-      const riskDollars =
-        balanceMode === "initial"
-          ? initialBalance * (riskPercent / 100)
-          : balance * (riskPercent / 100);
-
-      let value = 0;
-      if (unit === "r") {
-        value = data.r;
-      } else if (unit === "dollar") {
-        value = data.r * riskDollars;
-      } else {
-        value = data.r * riskPercent;
-      }
-
-      result.set(day, { value, balance });
-      if (balanceMode === "current") {
-        balance += value;
-      }
-    }
-
-    return result;
-  }, [dayMap, initialBalance, riskPercent, balanceMode, unit]);
+  const getDayTotals = (trades: DayTrade[]) => {
+    const totalR = trades.reduce((s, t) => s + (t.r ?? 0), 0);
+    const totalPnl = trades.reduce((s, t) => s + (t.pnlUsd ?? 0), 0);
+    return { totalR, totalPnl };
+  };
 
   const monthDays = useMemo<DayData[]>(() => {
     const startOfMonth = new Date(currentYear, currentMonth, 1);
     const offset = (startOfMonth.getDay() + 6) % 7;
     const start = new Date(currentYear, currentMonth, 1 - offset);
-    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-
     const days: DayData[] = [];
-    let balance = initialBalance;
 
     for (let i = 0; i < 42; i++) {
       const d = new Date(start);
@@ -169,57 +132,21 @@ export default function PerformanceCalendar({
       const key = toDateKey(d);
       const inMonth =
         d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+      const trades = dayMap.get(key) ?? [];
+      const { totalR, totalPnl } = getDayTotals(trades);
 
-      if (!inMonth) {
-        const prev = valueMap.get(key);
-        if (prev && balanceMode === "current") {
-          balance = prev.balance + prev.value;
-        }
-        days.push({
-          date: d,
-          inMonth: false,
-          count: 0,
-          r: 0,
-          value: 0,
-          balance,
-        });
-        continue;
-      }
-
-      const data = dayMap.get(key) || { count: 0, r: 0 };
-      const computed = valueMap.get(key);
-
-      if (computed) {
-        balance = balanceMode === "current" ? computed.balance : initialBalance;
-        days.push({
-          date: d,
-          inMonth: true,
-          count: data.count,
-          r: data.r,
-          value: computed.value,
-          balance: computed.balance,
-        });
-        if (balanceMode === "current") {
-          balance = computed.balance + computed.value;
-        }
-      } else {
-        if (balanceMode === "current") {
-          const last = days[days.length - 1];
-          if (last) balance = last.balance + last.value;
-        }
-        days.push({
-          date: d,
-          inMonth: true,
-          count: 0,
-          r: 0,
-          value: 0,
-          balance,
-        });
-      }
+      days.push({
+        date: d,
+        inMonth,
+        trades,
+        count: trades.length,
+        totalR,
+        totalPnl,
+      });
     }
 
     return days;
-  }, [currentYear, currentMonth, dayMap, valueMap, initialBalance, balanceMode]);
+  }, [currentYear, currentMonth, dayMap]);
 
   const yearMonths = useMemo<MonthData[]>(() => {
     const months: MonthData[] = [];
@@ -228,47 +155,52 @@ export default function PerformanceCalendar({
       const start = new Date(currentYear, m, 1);
       const daysInMonth = new Date(currentYear, m + 1, 0).getDate();
       let count = 0;
-      let r = 0;
-      let dollarValue = 0;
+      let totalR = 0;
+      let totalPnl = 0;
 
       for (let d = 0; d < daysInMonth; d++) {
         const day = new Date(start);
         day.setDate(start.getDate() + d);
         const key = toDateKey(day);
-        const data = dayMap.get(key);
-        const computed = valueMap.get(key);
-        if (data) {
-          count += data.count;
-          r += data.r;
-        }
-        if (computed) {
-          dollarValue += computed.value;
+        const trades = dayMap.get(key) ?? [];
+        if (trades.length) {
+          count += trades.length;
+          const t = getDayTotals(trades);
+          totalR += t.totalR;
+          totalPnl += t.totalPnl;
         }
       }
 
-      const value =
-        unit === "r"
-          ? r
-          : unit === "dollar"
-            ? dollarValue
-            : r * riskPercent;
-
-      months.push({ month: m, year: currentYear, count, r, value });
+      months.push({ month: m, year: currentYear, count, totalR, totalPnl });
     }
 
     return months;
-  }, [currentYear, dayMap, valueMap, riskPercent, unit]);
+  }, [currentYear, dayMap]);
+
+  const displayValue = (r: number, pnl: number) => (unit === "dollar" ? pnl : r);
 
   const formatValue = (v: number) => {
-    if (v === 0) return "0.00";
     const sign = v > 0 ? "+" : "";
-    if (unit === "dollar") return `${sign}${v.toFixed(2)} $US`;
-    if (unit === "r") return `${sign}${v.toFixed(2)}R`;
-    return `${sign}${v.toFixed(2)}%`;
+    if (unit === "dollar") {
+      return `${sign}${v.toLocaleString("fr-FR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })} $`;
+    }
+    return `${sign}${v.toFixed(2)}R`;
+  };
+
+  const formatTradeValue = (t: DayTrade) => {
+    if (unit === "dollar") {
+      if (t.pnlUsd === null) return "—";
+      return formatValue(t.pnlUsd);
+    }
+    if (t.r === null) return "—";
+    return formatValue(t.r);
   };
 
   const valueColor = (v: number) =>
-    v === 0 ? "text" : v > 0 ? "profit" : "loss";
+    v > 0 ? "profit" : v < 0 ? "loss" : "muted";
 
   const handlePrev = () => {
     if (view === "month") {
@@ -290,9 +222,17 @@ export default function PerformanceCalendar({
     }
   };
 
+  const tradeCount = useMemo(() => {
+    let n = 0;
+    dayMap.forEach((list) => {
+      n += list.length;
+    });
+    return n;
+  }, [dayMap]);
+
   if (!mounted) {
     return (
-      <Box minH="600px" color="muted">
+      <Box minH="400px" color="muted" fontSize="13px">
         Chargement du calendrier...
       </Box>
     );
@@ -302,87 +242,37 @@ export default function PerformanceCalendar({
     <Box>
       <Flex
         justify="space-between"
-        align={{ base: "flex-start", md: "center" }}
-        direction={{ base: "column", md: "row" }}
+        align="center"
         gap="16px"
-        mb="24px"
+        mb="18px"
+        flexWrap="wrap"
       >
         <Select
           value={unit}
           onChange={(e) => setUnit(e.target.value as Unit)}
           w="fit-content"
+          minW="160px"
           bg="surface"
           borderColor="border"
           fontSize="13px"
         >
           <option value="dollar">Dollar Profit</option>
           <option value="r">R:R</option>
-          <option value="percent">Pourcentage</option>
         </Select>
 
-        <Flex
-          align="center"
-          gap="12px"
-          flexWrap="wrap"
-          direction={{ base: "column", sm: "row" }}
-        >
-          <Flex align="center" gap="8px">
-            <Input
-              type="number"
-              value={initialBalance}
-              onChange={(e) => setInitialBalance(Number(e.target.value))}
-              w="110px"
-              bg="surface"
-              borderColor="border"
-              fontSize="13px"
-            />
-            <Text fontSize="13px" color="muted">
-              $
-            </Text>
-            <Input
-              type="number"
-              step={0.1}
-              value={riskPercent}
-              onChange={(e) => setRiskPercent(Number(e.target.value))}
-              w="70px"
-              bg="surface"
-              borderColor="border"
-              fontSize="13px"
-            />
-            <Text fontSize="13px" color="muted">
-              %
-            </Text>
-          </Flex>
-
-          <Flex
-            gap="8px"
-            border="1px solid"
-            borderColor="border"
-            borderRadius="6px"
-            p="4px"
-          >
-            <Button
-              size="sm"
-              variant={balanceMode === "initial" ? "primary" : "ghost"}
-              onClick={() => setBalanceMode("initial")}
-            >
-              Solde initial
-            </Button>
-            <Button
-              size="sm"
-              variant={balanceMode === "current" ? "primary" : "ghost"}
-              onClick={() => setBalanceMode("current")}
-            >
-              Solde actuel
-            </Button>
-          </Flex>
-        </Flex>
+        <Text fontSize="12px" color="muted">
+          {tradeCount} trade{tradeCount !== 1 ? "s" : ""} daté
+          {tradeCount !== 1 ? "s" : ""}
+          {tradeCount === 0
+            ? " · Renseigne PnL ($) et/ou Result (R) + une date sur tes trades."
+            : ""}
+        </Text>
       </Flex>
 
       <Flex
         justify="space-between"
         align="center"
-        mb="24px"
+        mb="20px"
         flexWrap="wrap"
         gap="12px"
       >
@@ -390,7 +280,12 @@ export default function PerformanceCalendar({
           <Button variant="icon" size="sm" onClick={handlePrev}>
             {"<"}
           </Button>
-          <Text fontSize="18px" fontWeight={550} minW="140px" textAlign="center">
+          <Text
+            fontSize="18px"
+            fontWeight={550}
+            minW="140px"
+            textAlign="center"
+          >
             {view === "month"
               ? `${monthLabels[currentMonth]} ${currentYear}`
               : `${currentYear}`}
@@ -401,7 +296,7 @@ export default function PerformanceCalendar({
         </Flex>
 
         <Flex
-          gap="8px"
+          gap="6px"
           border="1px solid"
           borderColor="border"
           borderRadius="6px"
@@ -409,14 +304,14 @@ export default function PerformanceCalendar({
         >
           <Button
             size="sm"
-            variant={view === "month" ? "primary" : "ghost"}
+            variant={view === "month" ? "primary" : "secondary"}
             onClick={() => setView("month")}
           >
             Month
           </Button>
           <Button
             size="sm"
-            variant={view === "year" ? "primary" : "ghost"}
+            variant={view === "year" ? "primary" : "secondary"}
             onClick={() => setView("year")}
           >
             Year
@@ -426,12 +321,12 @@ export default function PerformanceCalendar({
 
       {view === "month" ? (
         <>
-          <Grid templateColumns="repeat(7, 1fr)" gap="6px" mb="10px">
+          <Grid templateColumns="repeat(7, 1fr)" gap="6px" mb="8px">
             {dayLabels.map((d) => (
               <Text
                 key={d}
                 textAlign="center"
-                fontSize="12px"
+                fontSize="11px"
                 color="muted"
                 fontWeight={500}
               >
@@ -443,21 +338,22 @@ export default function PerformanceCalendar({
           <Grid templateColumns="repeat(7, 1fr)" gap="6px">
             {monthDays.map((d, i) => {
               const hasData = d.count > 0;
+              const dayValue = displayValue(d.totalR, d.totalPnl);
               const bg = hasData
-                ? d.value >= 0
+                ? dayValue >= 0
                   ? "rgba(99,199,154,0.12)"
                   : "rgba(228,124,130,0.12)"
                 : "surface";
               const border = hasData
-                ? d.value >= 0
-                  ? "rgba(99,199,154,0.25)"
-                  : "rgba(228,124,130,0.25)"
+                ? dayValue >= 0
+                  ? "rgba(99,199,154,0.35)"
+                  : "rgba(228,124,130,0.35)"
                 : "border";
 
               return (
                 <Box
                   key={i}
-                  minH="90px"
+                  minH="108px"
                   p="8px"
                   borderRadius="8px"
                   border="1px solid"
@@ -466,25 +362,64 @@ export default function PerformanceCalendar({
                   opacity={d.inMonth ? 1 : 0.35}
                 >
                   <Text
-                    fontSize="13px"
+                    fontSize="12px"
                     color={d.inMonth ? "text" : "muted"}
                     textAlign="right"
                     mb="6px"
+                    fontWeight={500}
                   >
                     {d.date.getDate()}
                   </Text>
                   {hasData && (
                     <>
-                      <Text fontSize="10px" color="muted" mb="2px">
-                        {d.count} trade{d.count > 1 ? "s" : ""}
+                      <Text fontSize="10px" color="muted" mb="4px">
+                        {d.count} position{d.count > 1 ? "s" : ""}
                       </Text>
                       <Text
                         fontSize="13px"
-                        fontWeight={600}
-                        color={valueColor(d.value)}
+                        fontWeight={650}
+                        color={valueColor(dayValue)}
+                        mb="6px"
+                        lineHeight="1.2"
                       >
-                        {formatValue(d.value)}
+                        {formatValue(dayValue)}
                       </Text>
+                      <Box>
+                        {d.trades.slice(0, 3).map((t) => {
+                          const tv =
+                            unit === "dollar" ? (t.pnlUsd ?? 0) : (t.r ?? 0);
+                          return (
+                            <Flex
+                              key={t.id}
+                              justify="space-between"
+                              gap="4px"
+                              mb="2px"
+                            >
+                              <Text
+                                fontSize="9px"
+                                color="muted"
+                                noOfLines={1}
+                                maxW="55%"
+                              >
+                                {t.symbol}
+                              </Text>
+                              <Text
+                                fontSize="9px"
+                                color={valueColor(tv)}
+                                fontWeight={600}
+                                whiteSpace="nowrap"
+                              >
+                                {formatTradeValue(t)}
+                              </Text>
+                            </Flex>
+                          );
+                        })}
+                        {d.trades.length > 3 && (
+                          <Text fontSize="9px" color="muted">
+                            +{d.trades.length - 3} more
+                          </Text>
+                        )}
+                      </Box>
                     </>
                   )}
                 </Box>
@@ -503,8 +438,9 @@ export default function PerformanceCalendar({
         >
           {yearMonths.map((m) => {
             const hasData = m.count > 0;
+            const monthValue = displayValue(m.totalR, m.totalPnl);
             const bg = hasData
-              ? m.value >= 0
+              ? monthValue >= 0
                 ? "rgba(99,199,154,0.12)"
                 : "rgba(228,124,130,0.12)"
               : "surface";
@@ -517,6 +453,12 @@ export default function PerformanceCalendar({
                 border="1px solid"
                 borderColor="border"
                 bg={bg}
+                cursor="pointer"
+                onClick={() => {
+                  setCurrentMonth(m.month);
+                  setView("month");
+                }}
+                _hover={{ borderColor: "borderHover" }}
               >
                 <Text fontSize="14px" fontWeight={550} mb="10px">
                   {monthLabels[m.month]}
@@ -524,19 +466,19 @@ export default function PerformanceCalendar({
                 {hasData ? (
                   <>
                     <Text fontSize="12px" color="muted" mb="4px">
-                      {m.count} trade{m.count > 1 ? "s" : ""}
+                      {m.count} position{m.count > 1 ? "s" : ""}
                     </Text>
                     <Text
                       fontSize="16px"
-                      fontWeight={600}
-                      color={valueColor(m.value)}
+                      fontWeight={650}
+                      color={valueColor(monthValue)}
                     >
-                      {formatValue(m.value)}
+                      {formatValue(monthValue)}
                     </Text>
                   </>
                 ) : (
                   <Text fontSize="12px" color="muted">
-                    Aucun trade
+                    Aucune position
                   </Text>
                 )}
               </Box>

@@ -3,6 +3,7 @@ export type ArticleStatus = "draft" | "published" | "archived";
 export type SectionTitleSize = "h2" | "h3" | "h4";
 export type TradeDirection = "long" | "short";
 export type TradeStatus = "open" | "won" | "lost" | "breakeven" | "cancelled";
+export type RiskMode = "amount" | "percent";
 
 export type Media = {
   id: string;
@@ -50,6 +51,9 @@ export type Trade = {
   stopLoss: number | null;
   takeProfit: number | null;
   resultR: number | null;
+  riskMode: RiskMode | null;
+  riskValue: number | null;
+  pnlUsd: number | null;
   status: TradeStatus;
   openedAt: string | null;
   closedAt: string | null;
@@ -83,6 +87,9 @@ export type ArticleListItem = {
   // Trade fields (live)
   symbol: string | null;
   resultR: number | null;
+  pnlUsd: number | null;
+  riskMode: RiskMode | null;
+  riskValue: number | null;
   tradeStatus: TradeStatus | null;
   openedAt: string | null;
   closedAt: string | null;
@@ -120,6 +127,9 @@ export type TradeInput = {
   stopLoss?: number | null;
   takeProfit?: number | null;
   resultR?: number | null;
+  riskMode?: RiskMode | null;
+  riskValue?: number | null;
+  pnlUsd?: number | null;
   status: TradeStatus;
   openedAt?: string | null;
   closedAt?: string | null;

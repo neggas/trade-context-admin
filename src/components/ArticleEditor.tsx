@@ -31,6 +31,7 @@ import type {
   Media,
   SectionInput,
   SectionTitleSize,
+  RiskMode,
   TradeDirection,
   TradeStatus,
 } from "types";
@@ -47,6 +48,12 @@ type SectionState = {
   titleSize: SectionTitleSize;
   content: string;
   media: Media[];
+};
+
+type TimelineEventState = {
+  title: string;
+  description: string;
+  eventTime: string;
 };
 
 type Props = {
@@ -100,9 +107,15 @@ export default function ArticleEditor({ type, articleId }: Props) {
   const [stopLoss, setStopLoss] = useState("");
   const [takeProfit, setTakeProfit] = useState("");
   const [resultR, setResultR] = useState("");
+  const [riskMode, setRiskMode] = useState<RiskMode>("percent");
+  const [riskValue, setRiskValue] = useState("");
+  const [pnlUsd, setPnlUsd] = useState("");
   const [tradeStatus, setTradeStatus] = useState<TradeStatus>("open");
   const [openedAt, setOpenedAt] = useState("");
   const [closedAt, setClosedAt] = useState("");
+  const [timelineEvents, setTimelineEvents] = useState<TimelineEventState[]>(
+    []
+  );
 
   useEffect(() => {
     if (articleId) setPersistedId(articleId);
@@ -141,9 +154,32 @@ export default function ArticleEditor({ type, articleId }: Props) {
       setResultR(
         article.trade.resultR !== null ? String(article.trade.resultR) : ""
       );
+      setRiskMode(article.trade.riskMode ?? "percent");
+      setRiskValue(
+        article.trade.riskValue !== null && article.trade.riskValue !== undefined
+          ? String(article.trade.riskValue)
+          : ""
+      );
+      setPnlUsd(
+        article.trade.pnlUsd !== null && article.trade.pnlUsd !== undefined
+          ? String(article.trade.pnlUsd)
+          : ""
+      );
       setTradeStatus(article.trade.status);
       setOpenedAt(toDateTimeLocal(article.trade.openedAt));
       setClosedAt(toDateTimeLocal(article.trade.closedAt));
+      setTimelineEvents(
+        (article.trade.events ?? [])
+          .slice()
+          .sort((a, b) => a.position - b.position)
+          .map((e) => ({
+            title: e.title ?? "",
+            description: e.description ?? "",
+            eventTime: toDateTimeLocal(e.eventTime),
+          }))
+      );
+    } else {
+      setTimelineEvents([]);
     }
   }, [article?.id]);
 
@@ -229,9 +265,22 @@ export default function ArticleEditor({ type, articleId }: Props) {
       stopLoss: stopLoss ? parseFloat(stopLoss) : null,
       takeProfit: takeProfit ? parseFloat(takeProfit) : null,
       resultR: resultR ? parseFloat(resultR) : null,
+      riskMode,
+      riskValue: riskValue ? parseFloat(riskValue) : null,
+      pnlUsd: pnlUsd ? parseFloat(pnlUsd) : null,
       status: tradeStatus,
       openedAt: openedAt ? new Date(openedAt).toISOString() : null,
       closedAt: closedAt ? new Date(closedAt).toISOString() : null,
+      events: timelineEvents
+        .filter((e) => e.title.trim() || e.eventTime)
+        .map((e, i) => ({
+          title: e.title.trim() || `Event ${i + 1}`,
+          description: e.description.trim() || null,
+          eventTime: e.eventTime
+            ? new Date(e.eventTime).toISOString()
+            : new Date().toISOString(),
+          position: i,
+        })),
     };
 
     return input;
@@ -420,10 +469,21 @@ export default function ArticleEditor({ type, articleId }: Props) {
           stopLoss: input.trade.stopLoss ?? null,
           takeProfit: input.trade.takeProfit ?? null,
           resultR: input.trade.resultR ?? null,
+          riskMode: input.trade.riskMode ?? null,
+          riskValue: input.trade.riskValue ?? null,
+          pnlUsd: input.trade.pnlUsd ?? null,
           status: input.trade.status,
           openedAt: input.trade.openedAt ?? null,
           closedAt: input.trade.closedAt ?? null,
-          events: [],
+          events: (input.trade.events ?? []).map((e, i) => ({
+            id: `preview-event-${i}`,
+            tradeId: "preview-trade",
+            position: e.position ?? i,
+            eventTime: e.eventTime,
+            title: e.title,
+            description: e.description ?? null,
+            createdAt: new Date().toISOString(),
+          })),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         }
@@ -621,6 +681,38 @@ export default function ArticleEditor({ type, articleId }: Props) {
             />
           </FormControl>
         </Grid>
+        <Grid templateColumns="repeat(3, 1fr)" gap="18px" mb="18px">
+          <FormControl>
+            <FormLabel variant="fieldLabel">Risk mode</FormLabel>
+            <Select
+              value={riskMode}
+              onChange={(e) => setRiskMode(e.target.value as RiskMode)}
+            >
+              <option value="percent">Percent %</option>
+              <option value="amount">Amount $</option>
+            </Select>
+          </FormControl>
+          <FormControl>
+            <FormLabel variant="fieldLabel">
+              Risk {riskMode === "percent" ? "(%)" : "($)"}
+            </FormLabel>
+            <Input
+              value={riskValue}
+              onChange={(e) => setRiskValue(e.target.value)}
+              placeholder={riskMode === "percent" ? "1" : "100"}
+              type="number"
+            />
+          </FormControl>
+          <FormControl>
+            <FormLabel variant="fieldLabel">PnL ($)</FormLabel>
+            <Input
+              value={pnlUsd}
+              onChange={(e) => setPnlUsd(e.target.value)}
+              placeholder="-20 or +40"
+              type="number"
+            />
+          </FormControl>
+        </Grid>
         <Grid templateColumns="1fr 1fr" gap="18px">
           <FormControl>
             <FormLabel variant="fieldLabel">Opened At</FormLabel>
@@ -639,6 +731,126 @@ export default function ArticleEditor({ type, articleId }: Props) {
             />
           </FormControl>
         </Grid>
+      </Box>
+
+      <Box mb="35px">
+        <Flex align="center" justify="space-between" mb="15px">
+          <Box>
+            <Text fontSize="14px" fontWeight={550}>
+              Timeline
+            </Text>
+            <Text fontSize="12px" color="muted" mt="4px">
+              Events shown on the public article page (setup, entry, management…).
+            </Text>
+          </Box>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() =>
+              setTimelineEvents([
+                ...timelineEvents,
+                {
+                  title: "",
+                  description: "",
+                  eventTime: toDateTimeLocal(new Date().toISOString()),
+                },
+              ])
+            }
+          >
+            + Add event
+          </Button>
+        </Flex>
+
+        {timelineEvents.length === 0 ? (
+          <Box
+            p="20px"
+            border="1px dashed"
+            borderColor="border"
+            color="muted"
+            fontSize="13px"
+          >
+            No timeline events yet. Add events to show the trade story on the
+            public page.
+          </Box>
+        ) : (
+          <Flex flexDir="column" gap="12px">
+            {timelineEvents.map((event, index) => (
+              <Box
+                key={index}
+                p="18px"
+                border="1px solid"
+                borderColor="border"
+                bg="surface"
+              >
+                <Flex align="center" justify="space-between" mb="14px">
+                  <Text variant="sectionNumber">
+                    Event {String(index + 1).padStart(2, "0")}
+                  </Text>
+                  <Button
+                    variant="iconDanger"
+                    size="sm"
+                    onClick={() =>
+                      setTimelineEvents(
+                        timelineEvents.filter((_, i) => i !== index)
+                      )
+                    }
+                  >
+                    ×
+                  </Button>
+                </Flex>
+                <Grid templateColumns="1fr 200px" gap="12px" mb="12px">
+                  <FormControl>
+                    <FormLabel variant="fieldLabel">Title</FormLabel>
+                    <Input
+                      value={event.title}
+                      onChange={(e) =>
+                        setTimelineEvents(
+                          timelineEvents.map((ev, i) =>
+                            i === index ? { ...ev, title: e.target.value } : ev
+                          )
+                        )
+                      }
+                      placeholder="Position opened"
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel variant="fieldLabel">Time</FormLabel>
+                    <Input
+                      type="datetime-local"
+                      value={event.eventTime}
+                      onChange={(e) =>
+                        setTimelineEvents(
+                          timelineEvents.map((ev, i) =>
+                            i === index
+                              ? { ...ev, eventTime: e.target.value }
+                              : ev
+                          )
+                        )
+                      }
+                    />
+                  </FormControl>
+                </Grid>
+                <FormControl>
+                  <FormLabel variant="fieldLabel">Description</FormLabel>
+                  <Textarea
+                    value={event.description}
+                    onChange={(e) =>
+                      setTimelineEvents(
+                        timelineEvents.map((ev, i) =>
+                          i === index
+                            ? { ...ev, description: e.target.value }
+                            : ev
+                        )
+                      )
+                    }
+                    placeholder="Optional details..."
+                    minH="70px"
+                  />
+                </FormControl>
+              </Box>
+            ))}
+          </Flex>
+        )}
       </Box>
 
       <Box mb="35px">

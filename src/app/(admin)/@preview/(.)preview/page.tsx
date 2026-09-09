@@ -199,6 +199,64 @@ export default function PreviewModal() {
             </Box>
           )}
 
+          {/* Timeline */}
+          {article.trade?.events && article.trade.events.length > 0 && (
+            <Box mt="40px" maxW="620px">
+              <Text
+                fontSize="14px"
+                fontWeight={550}
+                letterSpacing="-0.02em"
+                mb="18px"
+              >
+                Timeline
+              </Text>
+              <Box borderLeft="1px solid" borderColor="border" pl="0">
+                {article.trade.events
+                  .slice()
+                  .sort((a, b) => a.position - b.position)
+                  .map((event) => {
+                    const time = event.eventTime
+                      ? new Date(event.eventTime).toLocaleString("en-GB", {
+                        day: "2-digit",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                      : "—";
+                    return (
+                      <Box
+                        key={event.id}
+                        position="relative"
+                        pl="28px"
+                        pb="28px"
+                      >
+                        <Box
+                          position="absolute"
+                          top="4px"
+                          left="-4px"
+                          w="7px"
+                          h="7px"
+                          borderRadius="50%"
+                          bg="accent"
+                        />
+                        <Text fontSize="11px" color="muted">
+                          {time}
+                        </Text>
+                        <Text fontSize="15px" mt="6px">
+                          {event.title}
+                        </Text>
+                        {event.description && (
+                          <Text fontSize="13px" color="muted" mt="4px">
+                            {event.description}
+                          </Text>
+                        )}
+                      </Box>
+                    );
+                  })}
+              </Box>
+            </Box>
+          )}
+
           {/* Sections */}
           {article.sections.map((section, i) => (
             <Box key={i} mt="40px" maxW="620px">
